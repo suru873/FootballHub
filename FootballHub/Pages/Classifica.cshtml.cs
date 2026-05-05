@@ -4,6 +4,7 @@ using System.Text.Json;
 
 namespace FootballHub.Pages;
 
+
 public class ClassificaModel : PageModel
 {
     private readonly SportmonksService _api;

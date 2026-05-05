@@ -1,18 +1,16 @@
 @page
 @model ClassificaModel
-@using System.Text.Json
-
 @{
     ViewData["Title"] = "Classifica Serie A";
 
     bool hasData = false;
-    JsonElement data = default;
+    var data = new System.Text.Json.JsonElement();
 
-    if (Model.Classifica.ValueKind != JsonValueKind.Undefined &&
-        Model.Classifica.TryGetProperty("data", out data) &&
-        data.ValueKind == JsonValueKind.Array &&
-        data.GetArrayLength() > 0)
+    if (Model.Classifica.ValueKind != System.Text.Json.JsonValueKind.Undefined
+        && Model.Classifica.TryGetProperty("data", out var dataEl)
+        && dataEl.GetArrayLength() > 0)
     {
+        data = dataEl;
         hasData = true;
     }
 }
@@ -23,7 +21,11 @@
 {
     <div class="alert alert-warning">@Model.Errore</div>
 }
-else if (hasData)
+else if (!hasData)
+{
+    <div class="alert alert-info">Classifica non disponibile.</div>
+}
+else
 {
     <div class="table-responsive">
         <table class="table table-hover align-middle">
@@ -43,13 +45,12 @@ else if (hasData)
                 </tr>
             </thead>
             <tbody>
-
                 @foreach (var row in data.EnumerateArray())
                 {
                     int pos = row.TryGetProperty("position", out var p) ? p.GetInt32() : 0;
                     int pts = row.TryGetProperty("points", out var pt) ? pt.GetInt32() : 0;
-
                     string teamName = "", teamLogo = "";
+
                     if (row.TryGetProperty("participant", out var part))
                     {
                         teamName = part.TryGetProperty("name", out var tn) ? tn.GetString() ?? "" : "";
@@ -57,37 +58,34 @@ else if (hasData)
                     }
 
                     int played = 0, wins = 0, draws = 0, losses = 0, gf = 0, ga = 0;
-
-                    if (row.TryGetProperty("details", out var details) && details.ValueKind == JsonValueKind.Array)
+                    if (row.TryGetProperty("details", out var details))
                     {
                         foreach (var d in details.EnumerateArray())
                         {
                             if (!d.TryGetProperty("type", out var t)) continue;
-
                             string tName = t.TryGetProperty("name", out var tn2) ? tn2.GetString() ?? "" : "";
                             int val = d.TryGetProperty("value", out var v) ? v.GetInt32() : 0;
-
-                            if (tName == "Matches Played") played = val;
-                            else if (tName == "Won") wins = val;
-                            else if (tName == "Draw") draws = val;
-                            else if (tName == "Lost") losses = val;
-                            else if (tName == "Goals For") gf = val;
-                            else if (tName == "Goals Against") ga = val;
+                            switch (tName)
+                            {
+                                case "Matches Played": played = val; break;
+                                case "Won": wins = val; break;
+                                case "Draw": draws = val; break;
+                                case "Lost": losses = val; break;
+                                case "Goals For": gf = val; break;
+                                case "Goals Against": ga = val; break;
+                            }
                         }
                     }
 
-                    string form = row.TryGetProperty("form", out var formEl) ? formEl.GetString() ?? "" : "";
+                    string form = row.TryGetProperty("form", out var formEl)
+                    && formEl.ValueKind == System.Text.Json.JsonValueKind.String
+                    ? formEl.GetString() ?? "" : "";
 
                     int dr = gf - ga;
                     string rowClass = pos <= 4 ? "table-success" : pos >= 18 ? "table-danger" : "";
 
-                    string lastForm = string.IsNullOrEmpty(form)
-                    ? ""
-                    : (form.Length > 5 ? form.Substring(form.Length - 5) : form);
-
                     <tr class="@rowClass">
                         <td class="fw-semibold text-muted">@pos</td>
-
                         <td>
                             <div class="d-flex align-items-center gap-2">
                                 @if (!string.IsNullOrEmpty(teamLogo))
@@ -97,7 +95,6 @@ else if (hasData)
                                 <span class="fw-semibold">@teamName</span>
                             </div>
                         </td>
-
                         <td class="text-center">@played</td>
                         <td class="text-center">@wins</td>
                         <td class="text-center">@draws</td>
@@ -106,31 +103,19 @@ else if (hasData)
                         <td class="text-center">@ga</td>
                         <td class="text-center">@(dr >= 0 ? "+" + dr : dr.ToString())</td>
                         <td class="text-center fw-bold">@pts</td>
-
                         <td>
                             <div class="d-flex gap-1">
-                                @foreach (char c in lastForm)
+                                @foreach (char c in form.TakeLast(5))
                                 {
-                                    string col = c == 'W' ? "#1a7a3c"
-                                    : c == 'D' ? "#888888"
-                                    : "#c0392b";
-
+                                    string col = c == 'W' ? "#1a7a3c" : c == 'D' ? "#888" : "#c0392b";
                                     <span style="width:10px;height:10px;border-radius:50%;background:@col;display:inline-block;"></span>
                                 }
                             </div>
                         </td>
                     </tr>
                 }
-
             </tbody>
         </table>
     </div>
-
-    <small class="text-muted">
-        Verde = Champions League &nbsp;|&nbsp; Rosso = Retrocessione
-    </small>
-}
-else
-{
-    <div class="alert alert-info">Classifica non disponibile.</div>
+    <small class="text-muted">Verde = Champions League &nbsp;|&nbsp; Rosso = Retrocessione</small>
 }

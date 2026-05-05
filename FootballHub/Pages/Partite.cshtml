@@ -1,157 +1,143 @@
 @page
 @model PartiteModel
-@using System.Text.Json
-
 @{
-    ViewData["Title"] = "Partite";
+    ViewData["Title"] = "Partite Serie A";
 
     bool hasData = false;
-    JsonElement leghe = default;
+    var fixtures = new System.Text.Json.JsonElement();
 
-    if (Model.Partite.ValueKind != JsonValueKind.Undefined &&
-        Model.Partite.TryGetProperty("data", out leghe) &&
-        leghe.ValueKind == JsonValueKind.Array)
+    if (Model.Partite.ValueKind != System.Text.Json.JsonValueKind.Undefined
+        && Model.Partite.TryGetProperty("data", out var fixturesEl)
+        && fixturesEl.ValueKind == System.Text.Json.JsonValueKind.Array)
     {
-        hasData = true;
+        fixtures = fixturesEl;
+        hasData = fixturesEl.GetArrayLength() > 0;
     }
 }
 
-<h4 class="mb-3 fw-bold">&#128197; Partite per Data</h4>
+<h4 class="mb-3 fw-bold">&#128197; Serie A &mdash; Partite</h4>
 
 <form method="get" class="d-flex gap-2 mb-4">
     <input type="date" name="data" value="@Model.DataSelezionata" class="form-control" style="max-width:200px;" />
     <button type="submit" class="btn btn-success">Cerca</button>
+    <a href="/Partite" class="btn btn-outline-secondary">Oggi</a>
 </form>
 
 @if (!string.IsNullOrEmpty(Model.Errore))
 {
     <div class="alert alert-warning">@Model.Errore</div>
 }
-else if (hasData && leghe.GetArrayLength() > 0)
+else if (!hasData)
 {
-    foreach (var lega in leghe.EnumerateArray())
-    {
-        string legaNome = lega.TryGetProperty("name", out var ln) ? ln.GetString() ?? "" : "";
-        string legaLogo = lega.TryGetProperty("image_path", out var li) ? li.GetString() ?? "" : "";
-
-        if (!lega.TryGetProperty("today", out var matches) || matches.ValueKind != JsonValueKind.Array || matches.GetArrayLength() == 0)
-            continue;
-
-        <div class="mb-4">
-            <div class="d-flex align-items-center gap-2 mb-2">
-                @if (!string.IsNullOrEmpty(legaLogo))
-                {
-                    <img src="@legaLogo" width="24" height="24" />
-                }
-                <h6 class="fw-bold mb-0">@legaNome</h6>
-            </div>
-
-            <div class="row">
-                @foreach (var m in matches.EnumerateArray())
-                {
-                    string homeName = "Casa", awayName = "Ospite";
-                    string homeLogo = "", awayLogo = "";
-                    int homeScore = 0, awayScore = 0;
-                    bool started = false;
-                    string orario = "";
-
-                    if (m.TryGetProperty("participants", out var parts) && parts.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var part in parts.EnumerateArray())
-                        {
-                            bool isHome = part.TryGetProperty("meta", out var meta)
-                            && meta.TryGetProperty("location", out var loc)
-                            && loc.GetString() == "home";
-
-                            string pn = part.TryGetProperty("name", out var pnn) ? pnn.GetString() ?? "" : "";
-                            string pl = part.TryGetProperty("image_path", out var pli) ? pli.GetString() ?? "" : "";
-
-                            if (isHome)
-                            {
-                                homeName = pn;
-                                homeLogo = pl;
-                            }
-                            else
-                            {
-                                awayName = pn;
-                                awayLogo = pl;
-                            }
-                        }
-                    }
-
-                    if (m.TryGetProperty("scores", out var scores) && scores.ValueKind == JsonValueKind.Array)
-                    {
-                        started = true;
-
-                        foreach (var s in scores.EnumerateArray())
-                        {
-                            if (!s.TryGetProperty("description", out var desc) || desc.GetString() != "CURRENT")
-                                continue;
-
-                            if (!s.TryGetProperty("score", out var sc))
-                                continue;
-
-                            string par = sc.TryGetProperty("participant", out var pp) ? pp.GetString() ?? "" : "";
-                            int goals = sc.TryGetProperty("goals", out var g) ? g.GetInt32() : 0;
-
-                            if (par == "home") homeScore = goals;
-                            else if (par == "away") awayScore = goals;
-                        }
-                    }
-
-                    if (m.TryGetProperty("starting_at", out var sa))
-                    {
-                        string saStr = sa.GetString() ?? "";
-                        if (saStr.Length >= 16)
-                            orario = saStr.Substring(11, 5);
-                    }
-
-                    <div class="col-lg-4 col-md-6 mb-2">
-                        <div class="card shadow-sm">
-                            <div class="card-body text-center py-2">
-                                <div class="d-flex justify-content-around align-items-center">
-
-                                    <div style="width:80px;">
-                                        @if (!string.IsNullOrEmpty(homeLogo))
-                                        {
-                                            <img src="@homeLogo" width="30" height="30" class="mb-1" />
-                            
-                                            <br />
-                                        }
-                                        <small class="fw-semibold" style="font-size:11px;">@homeName</small>
-                                    </div>
-
-                                    <div class="px-2">
-                                        @if (started)
-                                        {
-                                            <span class="fs-5 fw-bold">@homeScore - @awayScore</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="text-muted fw-semibold">@orario</span>
-                                        }
-                                    </div>
-
-                                    <div style="width:80px;">
-                                        @if (!string.IsNullOrEmpty(awayLogo))
-                                        {
-                                            <img src="@awayLogo" width="30" height="30" class="mb-1" />
-                            
-                                            <br />
-                                        }
-                                        <small class="fw-semibold" style="font-size:11px;">@awayName</small>
-                                    </div>
-
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                }
-            </div>
-        </div>
-    }
+    <div class="alert alert-info">Nessuna partita di Serie A trovata per questa data.</div>
 }
 else
 {
-    <div class="alert alert-info">Nessuna partita trovata per questa data.</div>
+    <div class="row">
+        @foreach (var f in fixtures.EnumerateArray())
+        {
+            string nome = f.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
+            string[] sq = nome.Split(" vs ");
+            string homeName = sq.Length > 0 ? sq[0] : "Casa";
+            string awayName = sq.Length > 1 ? sq[1] : "Ospite";
+            string homeLogo = "", awayLogo = "";
+            int homeScore = 0, awayScore = 0;
+            bool hasScore = false;
+            string orario = "", statoLabel = "", statoBadge = "bg-secondary";
+
+            if (f.TryGetProperty("participants", out var parts))
+            {
+                foreach (var part in parts.EnumerateArray())
+                {
+                    bool isHome = part.TryGetProperty("meta", out var meta)
+                    && meta.TryGetProperty("location", out var loc)
+                    && loc.GetString() == "home";
+                    string pLogo = part.TryGetProperty("image_path", out var img) ? img.GetString() ?? "" : "";
+                    if (isHome) homeLogo = pLogo; else awayLogo = pLogo;
+                }
+            }
+
+            if (f.TryGetProperty("scores", out var scores) && scores.GetArrayLength() > 0)
+            {
+                hasScore = true;
+                foreach (var s in scores.EnumerateArray())
+                {
+                    if (!s.TryGetProperty("description", out var desc) || desc.GetString() != "CURRENT") continue;
+                    if (!s.TryGetProperty("score", out var sc)) continue;
+                    string par = sc.TryGetProperty("participant", out var pp) ? pp.GetString() ?? "" : "";
+                    int goals = sc.TryGetProperty("goals", out var g) ? g.GetInt32() : 0;
+                    if (par == "home") homeScore = goals; else awayScore = goals;
+                }
+            }
+
+            if (f.TryGetProperty("starting_at", out var sa))
+            {
+                string saStr = sa.GetString() ?? "";
+                if (saStr.Length >= 16) orario = saStr[11..16];
+            }
+
+            if (f.TryGetProperty("state", out var state) && state.TryGetProperty("name", out var stName))
+            {
+                string st = stName.GetString() ?? "";
+                statoLabel = st switch
+                {
+                    "FT" => "Finita",
+                    "NS" => "Non iniziata",
+                    "HT" => "Intervallo",
+                    "1H" or "2H" => "LIVE",
+                    _ => st
+                };
+                statoBadge = st switch
+                {
+                    "FT" => "bg-secondary",
+                    "NS" => "bg-info text-dark",
+                    "1H" or "2H" or "HT" => "bg-danger",
+                    _ => "bg-secondary"
+                };
+            }
+
+            <div class="col-lg-4 col-md-6 mb-3">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header text-white d-flex justify-content-between align-items-center"
+                         style="background:#1a7a3c;font-size:12px;">
+                        <span>Serie A</span>
+                        <span class="badge @statoBadge">
+                            @(string.IsNullOrEmpty(statoLabel) ? orario : statoLabel)
+                        </span>
+                    </div>
+                    <div class="card-body text-center py-3">
+                        <div class="d-flex justify-content-around align-items-center">
+                            <div style="width:90px;">
+                                @if (!string.IsNullOrEmpty(homeLogo))
+                                {
+                                    <img src="@homeLogo" width="36" height="36" class="mb-1" />
+                                    <br />
+         }
+                                <small class="fw-semibold" style="font-size:11px;">@homeName</small>
+                            </div>
+                            <div class="fw-bold px-2" style="font-size:22px;">
+                                @if (hasScore)
+                                {
+                                    @($"{homeScore} - {awayScore}")
+                                }
+                                else
+                                {
+
+                                    <span class="text-muted fs-6">@orario</span>
+                                }
+                            </div>
+                            <div style="width:90px;">
+                                @if (!string.IsNullOrEmpty(awayLogo))
+                                {
+                                    <img src="@awayLogo" width="36" height="36" class="mb-1" />
+                                    <br />
+         }
+                                <small class="fw-semibold" style="font-size:11px;">@awayName</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
 }

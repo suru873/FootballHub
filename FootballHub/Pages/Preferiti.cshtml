@@ -1,0 +1,72 @@
+@page
+@model PreferitiModel
+@{
+    ViewData["Title"] = "Squadre Preferite";
+}
+
+<h4 class="mb-3 fw-bold">Le mie squadre preferite</h4>
+
+@if (!string.IsNullOrEmpty(Model.Messaggio))
+{
+    <div class="alert alert-success alert-dismissible fade show">
+        @Model.Messaggio
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+
+else
+{
+    if (Model.Preferiti.Count > 0)
+    {
+        <div class="row mb-4">
+        @foreach (var s in Model.Preferiti)
+        {
+            <div class="col-md-3 col-sm-6 mb-3">
+                <div class="card text-center shadow-sm">
+                    <div class="card-body">
+                        @if (!string.IsNullOrEmpty(s.LogoUrl))
+                        { <img src="@s.LogoUrl" width="50" height="50" class="mb-2" /> }
+                        <h6 class="fw-bold">@s.NomeSquadra</h6>
+                        <small class="text-muted">@s.Campionato</small>
+                        <form method="post" asp-page-handler="Rimuovi" class="mt-2">
+                            <input type="hidden" name="id" value="@s.Id" />
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Rimuovi</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
+        </div>
+    }
+    else
+    {
+        <p class="text-muted">Non hai ancora squadre preferite. Aggiungine una qui sotto!</p>
+    }
+
+    <hr />
+    <h5 class="mb-3">Aggiungi una squadra manualmente</h5>
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="post" asp-page-handler="Aggiungi">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Nome Squadra</label>
+                        <input type="text" asp-for="NomeSquadra" class="form-control" placeholder="Es. Inter" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Campionato</label>
+                        <input type="text" asp-for="Campionato" class="form-control" placeholder="Es. Serie A" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">URL Logo (opzionale)</label>
+                        <input type="text" asp-for="LogoUrl" class="form-control" placeholder="https://..." />
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-success">+ Aggiungi ai preferiti</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+}

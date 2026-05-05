@@ -1,0 +1,27 @@
+@page
+@model FootballHub.Pages.Account.LoginModel
+@{ ViewData["Title"] = "Login"; }
+
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card shadow-sm">
+            <div class="card-header fw-semibold text-white" style="background-color:#1a7a3c;">Accedi a FootballHub</div>
+            <div class="card-body">
+                @if (!string.IsNullOrEmpty(Model.Errore))
+                { <div class="alert alert-danger">@Model.Errore</div> }
+                <form method="post">
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input type="text" asp-for="Username" class="form-control" required />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Password</label>
+                        <input type="password" asp-for="Password" class="form-control" required />
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">Accedi</button>
+                </form>
+                <p class="text-center mt-3 mb-0 small">Non hai un account? <a href="/Account/Register">Registrati</a></p>
+            </div>
+        </div>
+    </div>
+</div>

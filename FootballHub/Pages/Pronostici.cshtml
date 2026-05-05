@@ -1,0 +1,272 @@
+
+
+@page
+@model PronosticiModel
+@{
+    ViewData["Title"] = "Pronostici";
+}
+
+<h4 class="mb-3 fw-bold">Pronostici</h4>
+
+@if (!string.IsNullOrEmpty(Model.Messaggio))
+{
+    <div class="alert alert-success alert-dismissible fade show">
+        @Model.Messaggio
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@* Quote partite dal round corrente *@
+@if (Model.PartiteConQuote.ValueKind != System.Text.Json.JsonValueKind.Undefined
+  && Model.PartiteConQuote.TryGetProperty("data", out var roundData)
+  && roundData.TryGetProperty("fixtures", out var fixtures)
+  && fixtures.GetArrayLength() > 0)
+{
+    <h5 class="mb-3">Quote disponibili</h5>
+    <div class="row mb-4">
+    @foreach (var fix in fixtures.EnumerateArray())
+    {
+        string homeName = "Casa", awayName = "Ospite";
+        if (fix.TryGetProperty("participants", out var parts))
+        {
+            foreach (var part in parts.EnumerateArray())
+            {
+                bool isHome = part.TryGetProperty("meta", out var meta)
+                           && meta.TryGetProperty("location", out var loc)
+                           && loc.GetString() == "home";
+                string pn = part.TryGetProperty("name", out var pnn) ? pnn.GetString() ?? "" : "";
+                if (isHome) homeName = pn; else awayName = pn;
+            }
+        }
+
+        string q1 = "-", qX = "-", q2 = "-";
+        if (fix.TryGetProperty("odds", out var odds))
+        {
+            foreach (var odd in odds.EnumerateArray())
+            {
+                if (!odd.TryGetProperty("market", out var mkt)) continue;
+                string mktName = mkt.TryGetProperty("name", out var mn) ? mn.GetString() ?? "" : "";
+                if (mktName != "3Way Result") continue;
+                if (!odd.TryGetProperty("bookmaker", out var bk)) continue;
+
+                // cerca i valori 1, X, 2
+                if (odd.TryGetProperty("value", out var val))
+                {
+                    string label = odd.TryGetProperty("label", out var lb) ? lb.GetString() ?? "" : "";
+                    string v = val.GetString() ?? "-";
+                    if (label == "1") q1 = v;
+                    else if (label == "X") qX = v;
+                    else if (label == "2") q2 = v;
+                }
+            }
+        }
+
+        <div class="col-md-6 mb-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-semibold">@homeName</span>
+                        <span class="text-muted small">vs</span>
+                        <span class="fw-semibold">@awayName</span>
+                    </div>
+                    <div class="d-flex gap-2 justify-content-center">
+                        <div class="text-center border rounded p-2" style="min-width:60px;">
+                            <div class="small text-muted">1</div>
+                            <div class="fw-bold text-success">@q1</div>
+                        </div>
+                        <div class="text-center border rounded p-2" style="min-width:60px;">
+                            <div class="small text-muted">X</div>
+                            <div class="fw-bold text-warning">@qX</div>
+                        </div>
+                        <div class="text-center border rounded p-2" style="min-width:60px;">
+                            <div class="small text-muted">2</div>
+                            <div class="fw-bold text-danger">@q2</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    </div>
+}
+
+@* Form inserimento pronostico *@
+@if (HttpContext.Session.GetString("Username") == null)
+{
+    <div class="alert alert-warning">Devi essere <a href="/Account/Login">loggato</a> per inserire pronostici.</div>
+}
+else
+{
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-semibold text-white" style="background-color:#1a7a3c;">
+            Inserisci il tuo pronostico
+        </div>
+        <div class="card-body">
+            <form method="post">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Squadra Casa</label>
+                        <input type="text" asp-for="SquadraCasa" class="form-control" placeholder="Es. Inter" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Squadra Ospite</label>
+                        <input type="text" asp-for="SquadraOspite" class="form-control" placeholder="Es. Milan" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Data Partita</label>
+                        <input type="date" asp-for="DataPartita" class="form-control" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Pronostico</label>
+                        <div class="d-flex gap-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" asp-for="Risultato" value="1" id="r1" />
+                                <label class="form-check-label" for="r1"><strong>1</strong> Casa</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" asp-for="Risultato" value="X" id="rX" />
+                                <label class="form-check-label" for="rX"><strong>X</strong> Pareggio</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" asp-for="Risultato" value="2" id="r2" />
+                                <label class="form-check-label" for="r2"><strong>2</strong> Ospite</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-success">Salva pronostico</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @if (Model.ListaPronostici.Count > 0)
+    {
+        <h5 class="mb-3">I miei pronostici</h5>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Partita</th>
+                        <th class="text-center">Data</th>
+                        <th class="text-center">Pronostico</th>
+                        <th class="text-center">Inserito il</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var p in Model.ListaPronostici)
+                {
+                    <tr>
+                        <td class="fw-semibold">@p.SquadraCasa vs @p.SquadraOspite</td>
+                        <td class="text-center">@p.DataPartita.ToString("dd/MM/yyyy")</td>
+                        <td class="text-center">
+                            <span class="badge fs-6" style="background-color:#1a7a3c;">@p.RisultatoPronosticato</span>
+                        </td>
+                        <td class="text-center text-muted small">@p.DataInserimento.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td class="text-end">
+                            <form method="post" asp-page-handler="Elimina">
+                                <input type="hidden" name="id" value="@p.Id" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Elimina</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <p class="text-muted">Non hai ancora inserito pronostici.</p>
+    }
+}
+
+else
+{
+    <div class="card shadow-sm mb-4">
+        <div class="card-header fw-semibold text-white" style="background-color:#1a7a3c;">
+            Inserisci il tuo pronostico
+        </div>
+        <div class="card-body">
+            <form method="post">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Squadra Casa</label>
+                        <input type="text" asp-for="SquadraCasa" class="form-control" placeholder="Es. Inter" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Squadra Ospite</label>
+                        <input type="text" asp-for="SquadraOspite" class="form-control" placeholder="Es. Milan" required />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Data Partita</label>
+                        <input type="date" asp-for="DataPartita" class="form-control" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Pronostico</label>
+                        <div class="d-flex gap-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" asp-for="Risultato" value="1" id="r1" />
+                                <label class="form-check-label" for="r1"><strong>1</strong> Casa</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" asp-for="Risultato" value="X" id="rX" />
+                                <label class="form-check-label" for="rX"><strong>X</strong> Pareggio</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" asp-for="Risultato" value="2" id="r2" />
+                                <label class="form-check-label" for="r2"><strong>2</strong> Ospite</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-success">Salva pronostico</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @if (Model.ListaPronostici.Count > 0)
+    {
+        <h5 class="mb-3">I miei pronostici</h5>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Partita</th>
+                        <th class="text-center">Data</th>
+                        <th class="text-center">Pronostico</th>
+                        <th class="text-center">Inserito il</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var p in Model.ListaPronostici)
+                {
+                    <tr>
+                        <td class="fw-semibold">@p.SquadraCasa vs @p.SquadraOspite</td>
+                        <td class="text-center">@p.DataPartita.ToString("dd/MM/yyyy")</td>
+                        <td class="text-center">
+                            <span class="badge fs-6" style="background-color:#1a7a3c;">@p.RisultatoPronosticato</span>
+                        </td>
+                        <td class="text-center text-muted small">@p.DataInserimento.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td class="text-end">
+                            <form method="post" asp-page-handler="Elimina">
+                                <input type="hidden" name="id" value="@p.Id" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Elimina</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <p class="text-muted">Non hai ancora inserito pronostici.</p>
+    }
+}

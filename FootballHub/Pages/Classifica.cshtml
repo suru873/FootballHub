@@ -1,0 +1,136 @@
+@page
+@model ClassificaModel
+@using System.Text.Json
+
+@{
+    ViewData["Title"] = "Classifica Serie A";
+
+    bool hasData = false;
+    JsonElement data = default;
+
+    if (Model.Classifica.ValueKind != JsonValueKind.Undefined &&
+        Model.Classifica.TryGetProperty("data", out data) &&
+        data.ValueKind == JsonValueKind.Array &&
+        data.GetArrayLength() > 0)
+    {
+        hasData = true;
+    }
+}
+
+<h4 class="mb-3 fw-bold">Serie A &mdash; Classifica</h4>
+
+@if (!string.IsNullOrEmpty(Model.Errore))
+{
+    <div class="alert alert-warning">@Model.Errore</div>
+}
+else if (hasData)
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>#</th>
+                    <th>Squadra</th>
+                    <th class="text-center">G</th>
+                    <th class="text-center">V</th>
+                    <th class="text-center">P</th>
+                    <th class="text-center">S</th>
+                    <th class="text-center">GF</th>
+                    <th class="text-center">GS</th>
+                    <th class="text-center">DR</th>
+                    <th class="text-center fw-bold">Pt</th>
+                    <th>Forma</th>
+                </tr>
+            </thead>
+            <tbody>
+
+                @foreach (var row in data.EnumerateArray())
+                {
+                    int pos = row.TryGetProperty("position", out var p) ? p.GetInt32() : 0;
+                    int pts = row.TryGetProperty("points", out var pt) ? pt.GetInt32() : 0;
+
+                    string teamName = "", teamLogo = "";
+                    if (row.TryGetProperty("participant", out var part))
+                    {
+                        teamName = part.TryGetProperty("name", out var tn) ? tn.GetString() ?? "" : "";
+                        teamLogo = part.TryGetProperty("image_path", out var ti) ? ti.GetString() ?? "" : "";
+                    }
+
+                    int played = 0, wins = 0, draws = 0, losses = 0, gf = 0, ga = 0;
+
+                    if (row.TryGetProperty("details", out var details) && details.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var d in details.EnumerateArray())
+                        {
+                            if (!d.TryGetProperty("type", out var t)) continue;
+
+                            string tName = t.TryGetProperty("name", out var tn2) ? tn2.GetString() ?? "" : "";
+                            int val = d.TryGetProperty("value", out var v) ? v.GetInt32() : 0;
+
+                            if (tName == "Matches Played") played = val;
+                            else if (tName == "Won") wins = val;
+                            else if (tName == "Draw") draws = val;
+                            else if (tName == "Lost") losses = val;
+                            else if (tName == "Goals For") gf = val;
+                            else if (tName == "Goals Against") ga = val;
+                        }
+                    }
+
+                    string form = row.TryGetProperty("form", out var formEl) ? formEl.GetString() ?? "" : "";
+
+                    int dr = gf - ga;
+                    string rowClass = pos <= 4 ? "table-success" : pos >= 18 ? "table-danger" : "";
+
+                    string lastForm = string.IsNullOrEmpty(form)
+                    ? ""
+                    : (form.Length > 5 ? form.Substring(form.Length - 5) : form);
+
+                    <tr class="@rowClass">
+                        <td class="fw-semibold text-muted">@pos</td>
+
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                @if (!string.IsNullOrEmpty(teamLogo))
+                                {
+                                    <img src="@teamLogo" width="22" height="22" />
+                                }
+                                <span class="fw-semibold">@teamName</span>
+                            </div>
+                        </td>
+
+                        <td class="text-center">@played</td>
+                        <td class="text-center">@wins</td>
+                        <td class="text-center">@draws</td>
+                        <td class="text-center">@losses</td>
+                        <td class="text-center">@gf</td>
+                        <td class="text-center">@ga</td>
+                        <td class="text-center">@(dr >= 0 ? "+" + dr : dr.ToString())</td>
+                        <td class="text-center fw-bold">@pts</td>
+
+                        <td>
+                            <div class="d-flex gap-1">
+                                @foreach (char c in lastForm)
+                                {
+                                    string col = c == 'W' ? "#1a7a3c"
+                                    : c == 'D' ? "#888888"
+                                    : "#c0392b";
+
+                                    <span style="width:10px;height:10px;border-radius:50%;background:@col;display:inline-block;"></span>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+
+            </tbody>
+        </table>
+    </div>
+
+    <small class="text-muted">
+        Verde = Champions League &nbsp;|&nbsp; Rosso = Retrocessione
+    </small>
+}
+else
+{
+    <div class="alert alert-info">Classifica non disponibile.</div>
+}

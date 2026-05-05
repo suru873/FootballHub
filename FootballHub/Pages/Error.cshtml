@@ -1,0 +1,9 @@
+@page
+@model FootballHub.Pages.ErrorModel
+@{ ViewData["Title"] = "Errore"; }
+<div class="text-center mt-5">
+    <h2 class="text-danger">Si e' verificato un errore</h2>
+    <p class="text-muted">Qualcosa e' andato storto. Riprova piu' tardi.</p>
+    @if (Model.ShowRequestId) { <p class="small text-muted">Request ID: @Model.RequestId</p> }
+    <a href="/" class="btn btn-success mt-3">Torna alla Home</a>
+</div>

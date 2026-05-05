@@ -1,143 +1,128 @@
-@page
-@model PartiteModel
+﻿@page
+@model HubCalcio.Pages.PartiteModel
 @{
-    ViewData["Title"] = "Partite Serie A";
+    ViewData["Title"] = "Calendario Superliga Danese";
+}
 
-    bool hasData = false;
-    var fixtures = new System.Text.Json.JsonElement();
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+        <div>
+            <h2 class="mb-0"><i class="bi bi-calendar3 text-primary"></i> Superliga Danese</h2>
+            <small class="text-muted">Risultati e calendari per la stagione attuale</small>
+        </div>
+        <form method="get" class="d-flex align-items-center">
+            <input type="date" name="DataSelezionata" value="@Model.DataSelezionata"
+                   class="form-control shadow-sm" onchange="this.form.submit()" />
+        </form>
+    </div>
 
-    if (Model.Partite.ValueKind != System.Text.Json.JsonValueKind.Undefined
-        && Model.Partite.TryGetProperty("data", out var fixturesEl)
-        && fixturesEl.ValueKind == System.Text.Json.JsonValueKind.Array)
+    @if (Model.Partite.ValueKind == System.Text.Json.JsonValueKind.Array && Model.Partite.GetArrayLength() > 0)
     {
-        fixtures = fixturesEl;
-        hasData = fixturesEl.GetArrayLength() > 0;
-    }
-}
-
-<h4 class="mb-3 fw-bold">&#128197; Serie A &mdash; Partite</h4>
-
-<form method="get" class="d-flex gap-2 mb-4">
-    <input type="date" name="data" value="@Model.DataSelezionata" class="form-control" style="max-width:200px;" />
-    <button type="submit" class="btn btn-success">Cerca</button>
-    <a href="/Partite" class="btn btn-outline-secondary">Oggi</a>
-</form>
-
-@if (!string.IsNullOrEmpty(Model.Errore))
-{
-    <div class="alert alert-warning">@Model.Errore</div>
-}
-else if (!hasData)
-{
-    <div class="alert alert-info">Nessuna partita di Serie A trovata per questa data.</div>
-}
-else
-{
-    <div class="row">
-        @foreach (var f in fixtures.EnumerateArray())
-        {
-            string nome = f.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
-            string[] sq = nome.Split(" vs ");
-            string homeName = sq.Length > 0 ? sq[0] : "Casa";
-            string awayName = sq.Length > 1 ? sq[1] : "Ospite";
-            string homeLogo = "", awayLogo = "";
-            int homeScore = 0, awayScore = 0;
-            bool hasScore = false;
-            string orario = "", statoLabel = "", statoBadge = "bg-secondary";
-
-            if (f.TryGetProperty("participants", out var parts))
+        <div class="row g-3">
+            @foreach (var partita in Model.Partite.EnumerateArray())
             {
-                foreach (var part in parts.EnumerateArray())
+                // 1. ESTRAZIONE SICURA STATO (Risolve l'errore p.GetProperty("state"))
+                string statoNome = "N/A";
+                bool isLive = false;
+                if (partita.TryGetProperty("state", out var stateProp) && stateProp.TryGetProperty("name", out var nameProp))
                 {
-                    bool isHome = part.TryGetProperty("meta", out var meta)
-                    && meta.TryGetProperty("location", out var loc)
-                    && loc.GetString() == "home";
-                    string pLogo = part.TryGetProperty("image_path", out var img) ? img.GetString() ?? "" : "";
-                    if (isHome) homeLogo = pLogo; else awayLogo = pLogo;
+                    statoNome = nameProp.GetString() ?? "N/A";
+                    isLive = statoNome == "LIVE";
                 }
-            }
 
-            if (f.TryGetProperty("scores", out var scores) && scores.GetArrayLength() > 0)
-            {
-                hasScore = true;
-                foreach (var s in scores.EnumerateArray())
+                // 2. ESTRAZIONE NOME E CAMPIONATO
+                string leagueName = "Superliga";
+                if (partita.TryGetProperty("league", out var league) && league.TryGetProperty("name", out var ln))
                 {
-                    if (!s.TryGetProperty("description", out var desc) || desc.GetString() != "CURRENT") continue;
-                    if (!s.TryGetProperty("score", out var sc)) continue;
-                    string par = sc.TryGetProperty("participant", out var pp) ? pp.GetString() ?? "" : "";
-                    int goals = sc.TryGetProperty("goals", out var g) ? g.GetInt32() : 0;
-                    if (par == "home") homeScore = goals; else awayScore = goals;
+                    leagueName = ln.GetString() ?? "Superliga";
                 }
-            }
 
-            if (f.TryGetProperty("starting_at", out var sa))
-            {
-                string saStr = sa.GetString() ?? "";
-                if (saStr.Length >= 16) orario = saStr[11..16];
-            }
-
-            if (f.TryGetProperty("state", out var state) && state.TryGetProperty("name", out var stName))
-            {
-                string st = stName.GetString() ?? "";
-                statoLabel = st switch
+                // 3. ESTRAZIONE PUNTEGGI DINAMICA
+                int homeScore = 0;
+                int awayScore = 0;
+                if (partita.TryGetProperty("scores", out var scores))
                 {
-                    "FT" => "Finita",
-                    "NS" => "Non iniziata",
-                    "HT" => "Intervallo",
-                    "1H" or "2H" => "LIVE",
-                    _ => st
-                };
-                statoBadge = st switch
-                {
-                    "FT" => "bg-secondary",
-                    "NS" => "bg-info text-dark",
-                    "1H" or "2H" or "HT" => "bg-danger",
-                    _ => "bg-secondary"
-                };
-            }
+                    foreach (var s in scores.EnumerateArray())
+                    {
+                        if (s.TryGetProperty("description", out var desc) && desc.GetString() == "CURRENT")
+                        {
+                            if (s.TryGetProperty("score", out var sc) && s.TryGetProperty("participant", out var partSide))
+                            {
+                                int goals = sc.GetProperty("goals").GetInt32();
+                                if (partSide.GetString() == "home") homeScore = goals; else awayScore = goals;
+                            }
+                        }
+                    }
+                }
 
-            <div class="col-lg-4 col-md-6 mb-3">
-                <div class="card shadow-sm h-100">
-                    <div class="card-header text-white d-flex justify-content-between align-items-center"
-                         style="background:#1a7a3c;font-size:12px;">
-                        <span>Serie A</span>
-                        <span class="badge @statoBadge">
-                            @(string.IsNullOrEmpty(statoLabel) ? orario : statoLabel)
-                        </span>
-                    </div>
-                    <div class="card-body text-center py-3">
-                        <div class="d-flex justify-content-around align-items-center">
-                            <div style="width:90px;">
-                                @if (!string.IsNullOrEmpty(homeLogo))
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100 shadow-sm border-0">
+                        <div class="card-header bg-light d-flex justify-content-between py-2 border-0">
+                            <small class="text-muted fw-bold">@leagueName</small>
+                            <span class="badge @(isLive ? "bg-danger animate-pulse" : "bg-secondary")">
+                                @statoNome
+                            </span>
+                        </div>
+                        <div class="card-body py-4">
+                            <div class="d-flex justify-content-around align-items-center">
+                                @if (partita.TryGetProperty("participants", out var participants))
                                 {
-                                    <img src="@homeLogo" width="36" height="36" class="mb-1" />
-                                    <br />
-         }
-                                <small class="fw-semibold" style="font-size:11px;">@homeName</small>
-                            </div>
-                            <div class="fw-bold px-2" style="font-size:22px;">
-                                @if (hasScore)
-                                {
-                                    @($"{homeScore} - {awayScore}")
-                                }
-                                else
-                                {
+                                    foreach (var team in participants.EnumerateArray())
+                                    {
+                                        var isHome = team.GetProperty("meta").GetProperty("location").GetString() == "home";
+                                        <div class="text-center" style="width: 40%;">
+                                            <img src="@team.GetProperty("image_path").GetString()" class="mb-2" style="height: 45px;" />
+                                            <div class="small fw-bold text-truncate">@team.GetProperty("name").GetString()</div>
+                                            <h3 class="mt-2 mb-0">@(isHome? homeScore : awayScore)</h3>
+                                        </div>
+                                        if (isHome)
+                                        {
 
-                                    <span class="text-muted fs-6">@orario</span>
+                                            <div class="text-muted fs-4">-</div>
+                                        }
+                                    }
                                 }
-                            </div>
-                            <div style="width:90px;">
-                                @if (!string.IsNullOrEmpty(awayLogo))
-                                {
-                                    <img src="@awayLogo" width="36" height="36" class="mb-1" />
-                                    <br />
-         }
-                                <small class="fw-semibold" style="font-size:11px;">@awayName</small>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info text-center py-5 shadow-sm border-0">
+            <i class="bi bi-info-circle display-4 d-block mb-3 text-secondary"></i>
+            <h5>Nessuna partita trovata</h5>
+            <p class="mb-0">Non ci sono eventi per la Superliga Danese nella data selezionata (@Model.DataSelezionata).</p>
+        </div>
+    }
+</div>
+
+<style>
+    .animate-pulse {
+        animation: pulse-red 2s infinite;
+    }
+
+    @@keyframes pulse-red {
+        0% {
+            opacity: 1;
         }
-    </div>
-}
+
+        50% {
+            opacity: 0.5;
+        }
+
+        100% {
+            opacity: 1;
+        }
+    }
+
+    .card {
+        transition: transform 0.2s;
+    }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+</style>

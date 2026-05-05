@@ -1,26 +1,33 @@
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using FootballHub.Services;
 using System.Text.Json;
+using HubCalcio.Services; // Controlla che il namespace del tuo service sia corretto
 
-namespace FootballHub.Pages;
-
-public class IndexModel : PageModel
+namespace FootballHub.Pages
 {
-    private readonly SportmonksService _api;
-    public JsonElement Livescores { get; set; }
-    public JsonElement PartiteOggi { get; set; }
-    public string Errore { get; set; } = string.Empty;
-
-    public IndexModel(SportmonksService api) { _api = api; }
-
-    public async Task OnGetAsync()
+    public class IndexModel : PageModel
     {
-        try
+        private readonly SportmonksService _api;
+
+        // DEFINISCI QUESTE DUE PROPRIETÀ
+        public JsonElement Livescores { get; set; }
+        public string Errore { get; set; } = string.Empty;
+
+        public IndexModel(SportmonksService api) => _api = api;
+
+        public async Task OnGetAsync()
         {
-            Livescores = await _api.GetLivescoresAsync();
-            if (!Livescores.TryGetProperty("data", out var d) || d.GetArrayLength() == 0)
-                PartiteOggi = await _api.GetPartiteOggiAsync();
+            try
+            {
+                // Carichiamo i dati
+                Livescores = await _api.GetPartitePerDataAsync(DateTime.Now.ToString("yyyy-MM-dd"));
+            }
+            catch (Exception ex)
+            {
+                // Se c'è un errore, lo salviamo qui
+                Errore = "Si è verificato un problema: " + ex.Message;
+                // Inizializziamo Livescores come array vuoto per non far crashare la pagina
+                Livescores = JsonDocument.Parse("[]").RootElement;
+            }
         }
-        catch (Exception ex) { Errore = $"Errore: {ex.Message} | {ex.InnerException?.Message}"; }
     }
 }

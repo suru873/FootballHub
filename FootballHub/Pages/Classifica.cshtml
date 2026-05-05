@@ -1,121 +1,67 @@
 @page
-@model ClassificaModel
+@using System.Text.Json
+@model HubCalcio.ClassificaModel
 @{
-    ViewData["Title"] = "Classifica Serie A";
+    ViewData["Title"] = "Classifica Superliga Danese";
+}
 
-    bool hasData = false;
-    var data = new System.Text.Json.JsonElement();
+<div class="container mt-4">
+    <h2 class="mb-4"><i class="bi bi-trophy-fill text-warning"></i> Classifica Superliga</h2>
 
-    if (Model.Classifica.ValueKind != System.Text.Json.JsonValueKind.Undefined
-        && Model.Classifica.TryGetProperty("data", out var dataEl)
-        && dataEl.GetArrayLength() > 0)
+    @if (!string.IsNullOrEmpty(Model.Errore))
     {
-        data = dataEl;
-        hasData = true;
+        <div class="alert alert-danger shadow-sm">
+            <strong>Errore:</strong> @Model.Errore
+        </div>
     }
-}
-
-<h4 class="mb-3 fw-bold">Serie A &mdash; Classifica</h4>
-
-@if (!string.IsNullOrEmpty(Model.Errore))
-{
-    <div class="alert alert-warning">@Model.Errore</div>
-}
-else if (!hasData)
-{
-    <div class="alert alert-info">Classifica non disponibile.</div>
-}
-else
-{
-    <div class="table-responsive">
-        <table class="table table-hover align-middle">
-            <thead class="table-light">
-                <tr>
-                    <th>#</th>
-                    <th>Squadra</th>
-                    <th class="text-center">G</th>
-                    <th class="text-center">V</th>
-                    <th class="text-center">P</th>
-                    <th class="text-center">S</th>
-                    <th class="text-center">GF</th>
-                    <th class="text-center">GS</th>
-                    <th class="text-center">DR</th>
-                    <th class="text-center fw-bold">Pt</th>
-                    <th>Forma</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var row in data.EnumerateArray())
-                {
-                    int pos = row.TryGetProperty("position", out var p) ? p.GetInt32() : 0;
-                    int pts = row.TryGetProperty("points", out var pt) ? pt.GetInt32() : 0;
-                    string teamName = "", teamLogo = "";
-
-                    if (row.TryGetProperty("participant", out var part))
-                    {
-                        teamName = part.TryGetProperty("name", out var tn) ? tn.GetString() ?? "" : "";
-                        teamLogo = part.TryGetProperty("image_path", out var ti) ? ti.GetString() ?? "" : "";
-                    }
-
-                    int played = 0, wins = 0, draws = 0, losses = 0, gf = 0, ga = 0;
-                    if (row.TryGetProperty("details", out var details))
-                    {
-                        foreach (var d in details.EnumerateArray())
-                        {
-                            if (!d.TryGetProperty("type", out var t)) continue;
-                            string tName = t.TryGetProperty("name", out var tn2) ? tn2.GetString() ?? "" : "";
-                            int val = d.TryGetProperty("value", out var v) ? v.GetInt32() : 0;
-                            switch (tName)
-                            {
-                                case "Matches Played": played = val; break;
-                                case "Won": wins = val; break;
-                                case "Draw": draws = val; break;
-                                case "Lost": losses = val; break;
-                                case "Goals For": gf = val; break;
-                                case "Goals Against": ga = val; break;
-                            }
-                        }
-                    }
-
-                    string form = row.TryGetProperty("form", out var formEl)
-                    && formEl.ValueKind == System.Text.Json.JsonValueKind.String
-                    ? formEl.GetString() ?? "" : "";
-
-                    int dr = gf - ga;
-                    string rowClass = pos <= 4 ? "table-success" : pos >= 18 ? "table-danger" : "";
-
-                    <tr class="@rowClass">
-                        <td class="fw-semibold text-muted">@pos</td>
-                        <td>
-                            <div class="d-flex align-items-center gap-2">
-                                @if (!string.IsNullOrEmpty(teamLogo))
-                                {
-                                    <img src="@teamLogo" width="22" height="22" />
-                                }
-                                <span class="fw-semibold">@teamName</span>
-                            </div>
-                        </td>
-                        <td class="text-center">@played</td>
-                        <td class="text-center">@wins</td>
-                        <td class="text-center">@draws</td>
-                        <td class="text-center">@losses</td>
-                        <td class="text-center">@gf</td>
-                        <td class="text-center">@ga</td>
-                        <td class="text-center">@(dr >= 0 ? "+" + dr : dr.ToString())</td>
-                        <td class="text-center fw-bold">@pts</td>
-                        <td>
-                            <div class="d-flex gap-1">
-                                @foreach (char c in form.TakeLast(5))
-                                {
-                                    string col = c == 'W' ? "#1a7a3c" : c == 'D' ? "#888" : "#c0392b";
-                                    <span style="width:10px;height:10px;border-radius:50%;background:@col;display:inline-block;"></span>
-                                }
-                            </div>
-                        </td>
+    else if (Model.Classifica.ValueKind == JsonValueKind.Array)
+    {
+        <div class="table-responsive shadow rounded">
+            <table class="table table-hover align-middle mb-0 bg-white">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="text-center">Pos</th>
+                        <th>Squadra</th>
+                        <th class="text-center">PT</th>
+                        <th class="text-center">G</th>
+                        <th class="text-center text-success">V</th>
+                        <th class="text-center text-secondary">N</th>
+                        <th class="text-center text-danger">P</th>
                     </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-    <small class="text-muted">Verde = Champions League &nbsp;|&nbsp; Rosso = Retrocessione</small>
-}
+                </thead>
+                <tbody>
+                    @foreach (var row in Model.Classifica.EnumerateArray())
+                    {
+                        var team = row.TryGetProperty("participant", out var p) ? p : default;
+                        var details = row.TryGetProperty("details", out var d) ? d : default;
+
+                        // Funzione corretta per Sportmonks v3
+                        int GetStat(int typeId)
+                        {
+                            if (details.ValueKind != JsonValueKind.Array) return 0;
+                            var stat = details.EnumerateArray().FirstOrDefault(x =>
+                            x.TryGetProperty("type_id", out var t) && t.GetInt32() == typeId);
+
+                            return stat.ValueKind != JsonValueKind.Undefined && stat.TryGetProperty("value", out var v)
+                            ? v.GetInt32() : 0;
+                        }
+
+                        <tr>
+                            <td class="text-center fw-bold">@row.GetProperty("position").GetInt32()</td>
+                            <td>
+                                <img src="@team.GetProperty("image_path").GetString()" width="25" class="me-2" />
+                                <strong>@team.GetProperty("name").GetString()</strong>
+                            </td>
+                            <td class="text-center fw-bold text-primary">@row.GetProperty("points").GetInt32()</td>
+                            @* 129=Giocate, 130=Vinte, 131=Pareggi, 132=Perse *@
+                            <td class="text-center">@GetStat(129)</td>
+                            <td class="text-center">@GetStat(130)</td>
+                            <td class="text-center">@GetStat(131)</td>
+                            <td class="text-center">@GetStat(132)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>

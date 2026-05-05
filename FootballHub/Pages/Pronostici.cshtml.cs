@@ -1,69 +1,31 @@
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.EntityFrameworkCore;
-using FootballHub.Data;
-using FootballHub.Models;
-using FootballHub.Services;
 using System.Text.Json;
+using HubCalcio.Services;
 
-namespace FootballHub.Pages;
-
-public class PronosticiModel : PageModel
+namespace FootballHub.Pages
 {
-    private readonly AppDbContext _db;
-    private readonly SportmonksService _api;
-
-    public List<Pronostico> ListaPronostici { get; set; } = new();
-    public JsonElement PartiteConQuote { get; set; }
-    public string Messaggio { get; set; } = string.Empty;
-    public string Errore { get; set; } = string.Empty;
-
-    [BindProperty] public string SquadraCasa { get; set; } = string.Empty;
-    [BindProperty] public string SquadraOspite { get; set; } = string.Empty;
-    [BindProperty] public string Risultato { get; set; } = string.Empty;
-    [BindProperty] public DateTime DataPartita { get; set; } = DateTime.Today;
-
-    public PronosticiModel(AppDbContext db, SportmonksService api) { _db = db; _api = api; }
-
-    public async Task OnGetAsync()
+    public class PronosticiModel : PageModel
     {
-        int? uid = HttpContext.Session.GetInt32("UtenteId");
-        if (uid.HasValue)
-            ListaPronostici = await _db.Pronostici
-                .Where(p => p.UtenteId == uid.Value)
-                .OrderByDescending(p => p.DataInserimento)
-                .ToListAsync();
+        private readonly SportmonksService _api;
+        public JsonElement PartiteConQuote { get; set; }
+        public string Errore { get; set; }
 
-        try { PartiteConQuote = await _api.GetPronosticiApiAsync(); }
-        catch (Exception ex) { Errore = ex.Message; }
-    }
+        public PronosticiModel(SportmonksService api) => _api = api;
 
-    public async Task<IActionResult> OnPostAsync()
-    {
-        int? uid = HttpContext.Session.GetInt32("UtenteId");
-        if (!uid.HasValue) return RedirectToPage("/Account/Login");
-
-        if (!string.IsNullOrWhiteSpace(SquadraCasa) && !string.IsNullOrWhiteSpace(SquadraOspite) && !string.IsNullOrWhiteSpace(Risultato))
+        public async Task OnGetAsync()
         {
-            _db.Pronostici.Add(new Pronostico
+            try
             {
-                UtenteId = uid.Value,
-                SquadraCasa = SquadraCasa,
-                SquadraOspite = SquadraOspite,
-                RisultatoPronosticato = Risultato,
-                DataPartita = DataPartita
-            });
-            await _db.SaveChangesAsync();
-            Messaggio = "Pronostico salvato!";
+                // Recuperiamo le partite di oggi (il service deve includere 'odds')
+                // Se non hai un metodo specifico, usa quello delle partite filtrando per ID 271
+                PartiteConQuote = await _api.GetPartitePerDataAsync(DateTime.Now.ToString("yyyy-MM-dd"));
+            }
+            catch (Exception ex)
+            {
+                Errore = ex.Message;
+                // Inizializzazione di sicurezza per evitare il crash del ValueKind
+                PartiteConQuote = JsonDocument.Parse("[]").RootElement;
+            }
         }
-        await OnGetAsync();
-        return Page();
-    }
-
-    public async Task<IActionResult> OnPostEliminaAsync(int id)
-    {
-        var p = await _db.Pronostici.FindAsync(id);
-        if (p != null) { _db.Pronostici.Remove(p); await _db.SaveChangesAsync(); }
-        return RedirectToPage();
     }
 }
